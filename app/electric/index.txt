@@ -1,0 +1,411 @@
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { router } from "expo-router";
+import Customview from "../../components/customview";
+import { styles } from "./style";
+import {
+  AntDesign,
+  Feather,
+  FontAwesome5,
+  MaterialIcons,
+} from "@expo/vector-icons";
+import { ContactComponent } from "../../components/contacts/contact";
+import SetNotification from "../../notify";
+import Loader from "../../components/loader/loader";
+import Pinmodal from "../../components/pinmodal/pin";
+import Networkmodal from "./modal";
+import Typemodal from "./type";
+import { Log, Validate, Getprice, Fetch } from "./Log";
+import Datamodal from "./datamodal";
+import Feedmodal from "../../components/feedback/feed";
+import { Verifyprop } from "./prop";
+export default function Electric({ route }) {
+  const [name, setName] = useState(null);
+  const [price, setPrice] = useState(25);
+  const [isLoading, setIsloading] = useState(false);
+  const [isPin, setIspin] = useState(false);
+  const [products, setProducts] = useState([]);
+  const [netproducts, setNetProducts] = useState([]);
+  const [typearray, setTypeArray] = useState([])
+  const [texts, setText] = useState("");
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalContent, setModalContent] = useState("fhfhfhhjfjfjggsgs");
+  const [amount, setAmount] = useState("");
+  const [phone, setPhone] = useState("");
+  const [mymodal, setModal] = useState(false);
+  const [fact, setFact] = useState(false);
+  const [netmodal, setNet] = useState(false);
+  const [typemodal, setTypemodal] = useState(false);
+  const [datamodal, setDatamodal] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [verifystatus, setStatus] = useState(false);
+
+  const [image, setImage] = useState({
+    name: "",
+    billerIconUrl: "",
+    value: "aba-electric",
+  });
+  const [type, setType] = useState({
+    name: "",
+    kudaIdentifier: "",
+  });
+
+  const fetchData = async () => {
+    if (!texts) {
+      alert("Kindly Fill up Meter Number");
+      return;
+    }
+    if (texts.length < 6) {
+      alert("Kindly Fill up Meter Number");
+      return;
+    }
+
+    setIsloading(true);
+    try {
+      const response = await Validate( texts, type.kudaIdentifier);
+      if (response.success) {
+        const mydata = response.data;
+        console.log(mydata);
+        if (mydata.customerName) {
+          setName(mydata.customerName);
+          setStatus(true);
+        } else {
+          alert(mydata.error);
+        }
+      }
+    } catch (error) {
+      alert(
+        "Unable to verify The meter number currently! Kindly reach out to customer support if issue persists."
+      );
+    } finally {
+      setIsloading(false);
+    }
+  };
+  const fetch = async () => {
+    try {
+      const response = await Fetch();
+      if (response.success) {
+        const mydata = response.data.filter((items) => items.billItems.length > 0)
+        setNetProducts(mydata);
+      }
+    } catch (error) {
+      if (error && error.message) {
+        alert(error.message)
+        return
+      } else {
+        alert("Unable to fetch Electricity distribution")
+      }
+    }
+  }
+
+  const alan = () => {
+    if (texts === "") {
+      alert("Meter Number is empty");
+      return;
+    }
+    if (!phone || phone.length < 8) {
+      alert("Phone Number box is empty or invalid length");
+      return;
+    }
+    if (!verifystatus) {
+      Alert.alert(
+        "Confirm Action",
+        "This meter Number is unverified , Do you want to proceed still?",
+        [
+          {
+            text: "Cancel",
+            onPress: () => console.log("Action Canceled"),
+            style: "default",
+          },
+          { text: "Yes Please", onPress: () => setIspin(true) },
+        ],
+        { cancelable: true }
+      );
+    } else {
+      setIspin(true);
+    }
+  };
+
+  const handleSubmit = async () => {
+    setIsloading(true);
+    try {
+      const response = await Log(selectedPlan, texts);
+      const result = response;
+      if (result.success === true) {
+        setModalContent(result.message);
+        setFact(true);
+        SetNotification(
+          `Your Data Purchase of ${selectedPlan.plan} was Successful 🎉🎉`,
+          "Data Purchase Successful",
+          null
+        );
+      } else if (result.success === false) {
+        setFact(false);
+        setModalContent(result.message);
+        SetNotification(
+          `Your Data Purchase of ${selectedPlan.plan} Failed`,
+          "Data Purchase Failed",
+          null
+        );
+      }
+      setModalVisible(true);
+    } catch (error) {
+      const mydata = error.data;
+      setModalContent(
+        mydata.message ||
+        "We're currently unable to complete your request, Kindly try again later"
+      );
+      setFact(false);
+      setModalVisible(true);
+    } finally {
+      setIsloading(false);
+    }
+  };
+
+  const Contactinput = async (item) => {
+    console.log("i see the data sent", item);
+    const stringclean = item.replace(/[^0-9]/g, "");
+    if (stringclean.length > 10) {
+      const modified = stringclean.slice((0, -10));
+      const modString = "0" + modified;
+      console.log("this if fully cleaned", modString);
+      setPhone(modString);
+      setModal(false);
+    } else {
+      alert("Selected Contact is invalid");
+    }
+  };
+
+  useEffect(() => {
+    const getprice = async () => {
+      try {
+        const response = await Getprice();
+        const mydata = response;
+        if (mydata.success) {
+
+          const realdata = mydata.data[0]
+          setPrice(realdata.electricprice)
+          console.log(realdata.electricprice);
+        }
+      } catch (error) {
+        console.log(error);
+      }
+    };
+    fetch()
+    getprice()
+  }, []);
+
+  return (
+    <>
+      <Customview>
+        <View className="flex-1 items-center px-4">
+          <View className="w-full h-28 boder-b-[0.2px]">
+            <TouchableOpacity className="w-auto h-10 flex flex-row items-center ">
+              <MaterialIcons
+                name="arrow-back"
+                size={22}
+                className="mr-2 dark:hidden"
+                onPress={() => router.back()}
+              />
+              <MaterialIcons
+                name="arrow-back"
+                size={22}
+                className="mr-2 hidden dark:flex"
+                color="white"
+                onPress={() => router.back()}
+              />
+            </TouchableOpacity>
+            <Text className="text-2xl font-interbold text-gray-900 ml2 mt-2 dark:text-white">
+              Electricity
+            </Text>
+          </View>
+
+          <View className="w-full h-24">
+            <Text className="font-intermedium text-gray-800  text-md my-1 dark:text-white">
+              Distribution Company
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => setNet(true)}
+              className="w-full h-14 px-2 border-[0.5px] border-gray-500 rounded-md flex flex-row items-center"
+            >
+              <View className="flex flex-row items-center flex-grow">
+                <Image
+                  source={{ uri: image.billerIconUrl }}
+                  className="h-10 w-10 rounded-full"
+                />
+                <Text className="font-intermedium mx-3 dark:text-white">
+                  {image.name}
+                </Text>
+              </View>
+              <FontAwesome5 name="caret-down" className="" size={14} />
+            </TouchableOpacity>
+          </View>
+
+          <View className="w-full h-24">
+            <Text className="font-intermedium text-gray-800 dark:text-white text-md my-1">
+              Meter Type
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => setTypemodal(true)}
+              className="w-full h-14 px-3 border-[0.5px] border-gray-500 rounded-md flex flex-row items-center justify-between"
+            >
+              <Text className="font-intermedium  dark:text-white">
+                {type.name}
+              </Text>
+              <FontAwesome5 name="caret-down" className="" size={14} />
+            </TouchableOpacity>
+          </View>
+
+          <View className="w-full h-24">
+            <Text className="font-intermedium text-gray-800 dark:text-white text-md my-1">
+              Meter Number
+            </Text>
+
+            <View className="w-full h-14 px-2 border-[0.5px] border-gray-500 rounded-md flex flex-row items-center justify-between">
+              <TextInput
+                value={texts}
+                keyboardType="numeric"
+                onChangeText={(e) => {
+                  setText(e);
+                  setStatus(false);
+                }}
+                placeholder="Enter Meter Number"
+                className="flex-grow  dark:text-white"
+              />
+              <Verifyprop status={verifystatus} click={fetchData} />
+            </View>
+          </View>
+          {verifystatus && (
+            <View className="w-full h-14">
+              <View className="w-full h-14 px-2 border-[0.5px] border-gray-500 rounded-md flex flex-row items-center justify-between">
+                <Text className="flex-grow  dark:text-white text-center font-inter">
+                  {name}{" "}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <View className="w-full h-24">
+            <Text className="font-intermedium text-gray-800 dark:text-white text-md my-1">
+              Phone Number
+            </Text>
+
+            <TouchableOpacity className="w-full h-14 px-2 border-[0.5px] border-gray-500 rounded-md flex flex-row items-center justify-between">
+              <TextInput
+                value={phone}
+                keyboardType="numeric"
+                onChangeText={(e) => setPhone(e)}
+                placeholder="Enter Phone Number"
+                className="flex-grow dark:text-white"
+              />
+              <AntDesign
+                name="contacts"
+                size={23}
+                color="#4b0082"
+                onPress={() => setModal(true)}
+              />
+            </TouchableOpacity>
+          </View>
+
+          <View className="w-full h-24">
+            <Text className="font-intermedium text-gray-800 dark:text-white text-md my-1">
+              Amount
+            </Text>
+
+            <TouchableOpacity className="w-full h-14 px-3 border-[0.5px] border-gray-500 rounded-md flex flex-row items-center">
+              <TextInput
+                className="flex-grow h-full dark:text-white min-w-16"
+                value={amount}
+                onChangeText={(e) => setAmount(e)}
+                placeholder="0"
+                keyboardType="numeric"
+              />
+              <Text className="text-blue-600">+ ₦{price} charge</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.idancover}>
+            <TouchableOpacity
+              className="w-5/6 h-12 bg-mycolor rounded-lg flex flex-row items-center justify-center"
+              onPress={alan}
+            >
+              <Text style={styles.buttonin}>Purchase</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ContactComponent
+            Mymodal={mymodal}
+            Submit={(e) => Contactinput(e)}
+            Closemodal={() => setModal(false)}
+          />
+
+          <Modal visible={"hredar"} transparent={true} animationType="slide">
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <View style={styles.boxcenter}>
+                <ActivityIndicator size={30} color="red" />
+                <Text style={styles.pleasewait}> Please Wait...</Text>
+              </View>
+            </View>
+          </Modal>
+          <Loader isLoading={isLoading} />
+          <Pinmodal
+            visible={isPin}
+            close={() => setIspin(false)}
+            submit={() => handleSubmit()}
+          />
+          <Networkmodal
+            visible={netmodal}
+            submit={(e) => {
+              setNet(false);
+              setImage(e);
+              setTypeArray(e.billItems)
+            }}
+            netarray={netproducts}
+            close={() => setNet(false)}
+          />
+          <Typemodal
+            visible={typemodal}
+            close={() => setTypemodal(false)}
+            submit={(e) => {
+              setTypemodal(false);
+              setType(e);
+            }}
+            typearray={typearray}
+          />
+          <Datamodal
+            visible={datamodal}
+            close={() => setDatamodal(false)}
+            submit={(e) => {
+              setDatamodal(false);
+              setSelectedPlan(e);
+            }}
+            data={products}
+          />
+          <Feedmodal
+            modalContent={modalContent}
+            modalVisible={modalVisible}
+            fact={fact}
+            closeModal={() => setModalVisible(false)}
+          />
+        </View>
+      </Customview>
+    </>
+  );
+}
